@@ -14,10 +14,12 @@ COPY requirements.txt .
 RUN pip3 install --no-cache-dir selenium==4.10.0 reportlab==4.0.4 python-dotenv==1.0.0
 
 COPY print_page.py .
+COPY app.py .
 COPY config.json .
 
 RUN mkdir -p /tmp/img /tmp/pdf
 
 ENV PYTHONUNBUFFERED=1
+ENV PORT=8080
 
-CMD ["python3", "print_page.py"]
+CMD ["python3", "app.py"]
