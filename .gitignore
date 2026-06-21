@@ -7,5 +7,4 @@ pdf/
 *.png
 *.pdf
 venv/
-config.json
 .git/

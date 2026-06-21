@@ -302,6 +302,5 @@ def main():
     print(f"   Erros: {sites_erro}")
     print("=" * 60 + "\n")
 
-# Removido - agora é chamado pelo app.py
-#if __name__ == "__main__":
-#    main()
+if __name__ == "__main__":
+    main()
