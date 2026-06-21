@@ -1,0 +1,24 @@
+{
+  "sites": [
+    {
+      "id": "seu_id",
+      "url": "https://exemplo.com/",
+      "xpath_cookie": "/html/body/...",
+      "xpath_banner": "/html/body/...",
+      "nome_site": "NOME_EXEMPLO",
+      "zoom_banner": "100%",
+      "zoom_decisao": "70%",
+      "emails": [
+        "email1@gmail.com",
+        "email2@gmail.com"
+      ],
+      "ativo": true
+    }
+  ],
+  "email": {
+    "sender": "seu_email@gmail.com",
+    "password": "sua_senha_app",
+    "smtp_server": "smtp.gmail.com",
+    "smtp_port": 587
+  }
+}
