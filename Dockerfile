@@ -21,4 +21,4 @@ RUN mkdir -p /tmp/img /tmp/pdf
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 
-ENTRYPOINT ["python3", "print_page.py"]
+ENTRYPOINT ["python3", "app.py"]
