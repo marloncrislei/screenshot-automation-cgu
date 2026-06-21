@@ -19,5 +19,6 @@ COPY config.json .
 RUN mkdir -p /tmp/img /tmp/pdf
 
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
 
-CMD ["python3", "print_page.py"]
+ENTRYPOINT ["python3", "print_page.py"]
