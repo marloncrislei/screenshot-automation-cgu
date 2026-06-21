@@ -1,0 +1,24 @@
+{
+  "sites": [
+    {
+      "id": "decal_brasil",
+      "url": "https://www.decalbrasil.com/",
+      "xpath_cookie": "/html/body/dialog/div/div/div[2]/div[2]/div[2]/div[1]/button",
+      "xpath_banner": "/html/body/div/div/a",
+      "nome_site": "DECAL_BRASIL",
+      "zoom_banner": "100%",
+      "zoom_decisao": "70%",
+      "emails": [
+        "renata.cgu@gmail.com",
+        "mcs.solucoes.tecnologia@gmail.com"
+      ],
+      "ativo": true
+    }
+  ],
+  "email": {
+    "sender": "mcs.solucoes.tecnologia@gmail.com",
+    "password": "ijha xdsp kfzg vrou",
+    "smtp_server": "smtp.gmail.com",
+    "smtp_port": 587
+  }
+}
