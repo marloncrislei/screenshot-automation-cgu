@@ -1,65 +1,40 @@
 #!/usr/bin/env python3
-import sys
 import os
-import socket
 from http.server import HTTPServer, BaseHTTPRequestHandler
-
-print("=" * 60)
-print("🚀 Iniciando aplicação...")
-print("=" * 60)
-
-# Debug: verificar porta
-port = int(os.environ.get('PORT', 8080))
-print(f"✅ Porta: {port}")
-
-# Debug: verificar se pode usar socket
-try:
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind(('0.0.0.0', port))
-    sock.listen(1)
-    sock.close()
-    print(f"✅ Porta {port} disponível para uso")
-except Exception as e:
-    print(f"❌ Erro ao vincular porta: {e}")
-    sys.exit(1)
-
-# Tentar importar print_page
-try:
-    import print_page
-    print("✅ print_page importado com sucesso")
-except Exception as e:
-    print(f"⚠️  Aviso ao importar print_page: {e}")
-    print_page = None
+import subprocess
+import threading
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        """Executa quando recebe uma requisição GET"""
+        """Responde OK imediatamente, executa script em background"""
+        # Responder ao Cloud Run que tudo OK
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain; charset=utf-8')
+        self.end_headers()
+        self.wfile.write('✅ OK\n'.encode())
+        
+        # Executar script em background (não bloqueia resposta)
+        thread = threading.Thread(target=self.executar_screenshot)
+        thread.daemon = True
+        thread.start()
+    
+    def executar_screenshot(self):
+        """Executa o screenshot em background"""
         try:
-            if self.path == '/health' or self.path == '/':
-                # Health check
-                self.send_response(200)
-                self.send_header('Content-type', 'text/plain')
-                self.end_headers()
-                self.wfile.write(b'✅ OK')
-                print("✅ Health check ok")
-            else:
-                self.send_response(404)
-                self.end_headers()
+            print("\n" + "="*60)
+            print("🚀 Executando screenshot em background...")
+            print("="*60)
+            subprocess.run(['python3', 'print_page.py'], check=True)
+            print("✅ Screenshot concluído!")
         except Exception as e:
-            print(f"❌ Erro: {e}")
-            self.send_response(500)
-            self.end_headers()
+            print(f"❌ Erro ao executar screenshot: {e}")
     
     def log_message(self, format, *args):
-        print(f"[{self.address_string()}] {format % args}")
+        print(f"[LOG] {format % args}")
 
-# Iniciar servidor
-try:
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8080))
+    print(f"🌐 Servidor escutando em 0.0.0.0:{port}")
+    
     server = HTTPServer(('0.0.0.0', port), Handler)
-    print(f"✅ Servidor iniciado em 0.0.0.0:{port}")
-    print("=" * 60)
     server.serve_forever()
-except Exception as e:
-    print(f"❌ Erro ao iniciar servidor: {e}")
-    sys.exit(1)
