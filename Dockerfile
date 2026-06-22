@@ -1,11 +1,9 @@
-FROM ubuntu:22.04
+FROM mcr.microsoft.com/playwright:v1.40.0-jammy
 
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     python3-pillow \
-    chromium-browser \
-    chromium-chromedriver \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
