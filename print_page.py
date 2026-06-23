@@ -1,12 +1,7 @@
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from PIL import Image
+from playwright.sync_api import sync_playwright
 import datetime 
 import os
 import time
-import json
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 import smtplib
@@ -14,6 +9,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
+import json
 
 # ============ CARREGAR CONFIGURAÇÃO ============
 def carregar_config():
@@ -21,144 +17,93 @@ def carregar_config():
     config_path = os.path.join(os.path.dirname(__file__), 'config.json')
     
     if not os.path.exists(config_path):
-        raise FileNotFoundError(f"❌ Arquivo config.json não encontrado em {config_path}")
+        raise FileNotFoundError(f"❌ Arquivo config.json não encontrado")
     
     with open(config_path, 'r', encoding='utf-8') as f:
         config = json.load(f)
     
-    print(f"✅ Configuração carregada com {len(config.get('sites', []))} site(s)")
     return config
 
-# ============ CONFIGURAÇÕES GLOBAIS ============
-try:
-    CONFIG = carregar_config()
-    EMAIL_CONFIG = CONFIG.get('email', {})
-    SITES = CONFIG.get('sites', [])
-except Exception as e:
-    print(f"❌ Erro ao carregar config.json: {e}")
-    raise
+# ============ CONFIGURAÇÕES ============
+CONFIG = carregar_config()
+EMAIL_CONFIG = CONFIG.get('email', {})
+SITES = CONFIG.get('sites', [])
 
 data = datetime.datetime.now()
 agora = data.strftime('%Y%m%d %Hh%Mm%Ss')
 
-SHOW_BROWSER = False
-
-# Caminhos
 IMG_PATH = os.getenv('IMG_PATH', '/tmp/img/')
 PDF_PATH = os.getenv('PDF_PATH', '/tmp/pdf/')
 
-# Criar pastas
 os.makedirs(IMG_PATH, exist_ok=True)
 os.makedirs(PDF_PATH, exist_ok=True)
 
-# ============ CONFIGURAR CHROME ============
-def criar_driver():
-    """Cria driver Chrome com opções para servidor"""
-    chrome_options = Options()
-    
-    # Modo headless (sem interface gráfica)
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--window-size=1920,1080")
-    chrome_options.add_argument("--disable-web-resources")
-    chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--disable-plugins")
-    chrome_options.add_argument("--disable-images")
-    chrome_options.add_argument("--start-maximized")
-    chrome_options.add_argument("--remote-debugging-port=9222")
-    
-    if not SHOW_BROWSER:
-        chrome_options.add_experimental_option("detach", True)
-    
-    try:
-        driver = webdriver.Chrome(options=chrome_options)
-        return driver
-    except Exception as e:
-        print(f"❌ Erro ao criar Chrome driver: {e}")
-        raise
+print("=" * 60)
+print(f"🚀 INICIANDO MONITORAMENTO - {agora}")
+print("=" * 60)
 
-# ============ CAPTURAR SCREENSHOTS ============
+# ============ CAPTURAR SCREENSHOTS COM PLAYWRIGHT ============
 def capturar_screenshots(site_config):
-    """Captura os dois screenshots de um site"""
+    """Captura os dois screenshots usando Playwright"""
     url = site_config.get('url')
     nome_site = site_config.get('nome_site')
     xpath_cookie = site_config.get('xpath_cookie')
     xpath_banner = site_config.get('xpath_banner')
-    zoom_banner = site_config.get('zoom_banner', '100%')
-    zoom_decisao = site_config.get('zoom_decisao', '70%')
     
     print("\n" + "=" * 60)
     print(f"🌐 Processando: {nome_site}")
     print(f"URL: {url}")
     print("=" * 60)
     
-    driver = criar_driver()
+    filename_banner = None
+    filename_decisao = None
     
-    try:
-        print("📖 Acessando URL...")
-        driver.get(url)
-        time.sleep(2)
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
         
-        # Aceitar cookies (se existir)
-        if xpath_cookie:
-            try:
-                print("🍪 Aceitando cookies...")
-                submit_button = driver.find_element(by=By.XPATH, value=xpath_cookie)
-                submit_button.click()
-                time.sleep(1)
-            except Exception as e:
-                print(f"⚠️  Botão de cookies não encontrado: {e}")
-        
-        titulo = driver.title
-        print(f'✅ Título: {titulo}')
-        
-        # PRIMEIRA IMAGEM: Banner
-        print("📸 Capturando Banner...")
-        driver.execute_script(f"document.body.style.zoom='{zoom_banner}'")
-        time.sleep(2)
-        
-        filename_banner = f'[Banner][{agora}][{nome_site}].png'
-        driver.save_screenshot(IMG_PATH + filename_banner)
-        print(f"✅ Banner salvo: {filename_banner}")
-        
-        # Clicar no banner (se XPath for fornecido)
-        if xpath_banner:
-            print("🖱️  Clicando no banner...")
-            try:
-                submit_button = driver.find_element(By.XPATH, value=xpath_banner)
-                submit_button.click()
-                time.sleep(2)
-                
-                # Trocar para segunda guia
-                if len(driver.window_handles) > 1:
-                    driver.switch_to.window(driver.window_handles[1])
-                    driver.execute_script(f"document.body.style.zoom='{zoom_decisao}'")
+        try:
+            print("📖 Acessando URL...")
+            page.goto(url, wait_until="networkidle")
+            time.sleep(2)
+            
+            # Aceitar cookies
+            if xpath_cookie:
+                try:
+                    print("🍪 Clicando em aceitar cookies...")
+                    page.click(f"xpath={xpath_cookie}")
+                    time.sleep(1)
+                except:
+                    print("⚠️  Botão de cookies não encontrado")
+            
+            # PRIMEIRA IMAGEM
+            print("📸 Capturando Banner...")
+            filename_banner = f'[Banner][{agora}][{nome_site}].png'
+            page.screenshot(path=IMG_PATH + filename_banner)
+            print(f"✅ Banner salvo: {filename_banner}")
+            
+            # Clicar no banner
+            if xpath_banner:
+                try:
+                    print("🖱️  Clicando no banner...")
+                    page.click(f"xpath={xpath_banner}")
+                    time.sleep(2)
                     
-                    # SEGUNDA IMAGEM: Decisão
+                    # SEGUNDA IMAGEM
                     print("📸 Capturando Decisão...")
                     filename_decisao = f'[Decisao][{agora}][{nome_site}].png'
-                    time.sleep(2)
-                    driver.save_screenshot(IMG_PATH + filename_decisao)
+                    page.screenshot(path=IMG_PATH + filename_decisao)
                     print(f"✅ Decisão salva: {filename_decisao}")
-                    
-                    return filename_banner, filename_decisao, nome_site
-                else:
-                    print("⚠️  Segunda guia não aberta")
-                    return filename_banner, None, nome_site
-                    
-            except Exception as e:
-                print(f"❌ Erro ao clicar no banner: {e}")
-                return filename_banner, None, nome_site
-        else:
-            return filename_banner, None, nome_site
+                except Exception as e:
+                    print(f"⚠️  Erro ao clicar: {e}")
             
-    except Exception as e:
-        print(f"❌ Erro geral: {e}")
-        raise
-    finally:
-        driver.quit()
+            return filename_banner, filename_decisao, nome_site
+            
+        except Exception as e:
+            print(f"❌ Erro: {e}")
+            raise
+        finally:
+            browser.close()
 
 # ============ CRIAR PDF ============
 def criar_pdf(filename_banner, filename_decisao, nome_site, url):
@@ -182,7 +127,7 @@ def criar_pdf(filename_banner, filename_decisao, nome_site, url):
         if filename_decisao:
             cnv.drawImage(IMG_PATH + filename_decisao, 40, -120, width=525, preserveAspectRatio=True)
         
-        # Linhas divisórias
+        # Linhas
         cnv.setLineWidth(1)
         cnv.setStrokeGray(0.95)
         cnv.line(40, 730, 565.5, 730)
@@ -211,36 +156,32 @@ def criar_pdf(filename_banner, filename_decisao, nome_site, url):
 
 # ============ ENVIAR EMAIL ============
 def enviar_email_pdf(caminho_pdf, emails_destinatarios, nome_site):
-    """Envia email com PDF em anexo para múltiplos destinatários"""
+    """Envia email com PDF"""
     if not emails_destinatarios:
         print("⏭️  Nenhum email configurado")
         return
     
     try:
-        print(f"📧 Preparando email para {len(emails_destinatarios)} destinatário(s)...")
+        print(f"📧 Preparando email...")
         
         email_sender = EMAIL_CONFIG.get('sender')
         email_password = EMAIL_CONFIG.get('password')
         smtp_server = EMAIL_CONFIG.get('smtp_server', 'smtp.gmail.com')
         smtp_port = int(EMAIL_CONFIG.get('smtp_port', 587))
         
-        # Validar variáveis
         if not all([email_sender, email_password]):
-            print("❌ Credenciais de email não configuradas no config.json")
+            print("❌ Credenciais não configuradas")
             return
         
-        # Criar mensagem
         msg = MIMEMultipart()
         msg['From'] = email_sender
         msg['To'] = ', '.join(emails_destinatarios)
-        msg['Subject'] = f'Monitoramento Publicação [{nome_site}][{data.strftime("%d/%m/%Y %H:%M:%S")}]'
+        msg['Subject'] = f'Monitoramento [{nome_site}][{data.strftime("%d/%m/%Y %H:%M:%S")}]'
         
-        # Corpo do email
         corpo_email = f'<p>Monitoramento de publicações - {nome_site}</p><br>'
         msg.attach(MIMEText(corpo_email, 'html'))
         
         # Anexar PDF
-        print(f"📎 Anexando PDF: {caminho_pdf}")
         with open(caminho_pdf, 'rb') as attachment:
             part = MIMEBase('application', 'octet-stream')
             part.set_payload(attachment.read())
@@ -249,7 +190,7 @@ def enviar_email_pdf(caminho_pdf, emails_destinatarios, nome_site):
             msg.attach(part)
         
         # Enviar
-        print(f"📤 Conectando a {smtp_server}:{smtp_port}...")
+        print(f"📤 Enviando para {len(emails_destinatarios)} destinatário(s)...")
         server = smtplib.SMTP(smtp_server, smtp_port)
         server.starttls()
         server.login(email_sender, email_password)
@@ -266,47 +207,30 @@ def enviar_email_pdf(caminho_pdf, emails_destinatarios, nome_site):
 
 # ============ MAIN ============
 def main():
-    """Função principal - processa todos os sites ativos"""
-    print("\n" + "=" * 60)
-    print(f"🚀 INICIANDO MONITORAMENTO - {agora}")
-    print("=" * 60)
-    
+    """Função principal"""
     sites_processados = 0
     sites_erro = 0
     
     for site_config in SITES:
         if not site_config.get('ativo', True):
-            print(f"⏭️  Site {site_config.get('nome_site')} desativado - pulando")
+            print(f"⏭️  Site {site_config.get('nome_site')} desativado")
             continue
         
         try:
-            # 1. Capturar screenshots
             filename_banner, filename_decisao, nome_site = capturar_screenshots(site_config)
-            
-            # 2. Criar PDF
-            caminho_pdf = criar_pdf(
-                filename_banner, 
-                filename_decisao, 
-                nome_site,
-                site_config.get('url')
-            )
-            
-            # 3. Enviar email
+            caminho_pdf = criar_pdf(filename_banner, filename_decisao, nome_site, site_config.get('url'))
             emails = site_config.get('emails', [])
             enviar_email_pdf(caminho_pdf, emails, nome_site)
             
             sites_processados += 1
             
         except Exception as e:
-            print(f"❌ ERRO ao processar {site_config.get('nome_site')}: {e}")
+            print(f"❌ ERRO: {e}")
             sites_erro += 1
-            continue
     
     print("\n" + "=" * 60)
-    print(f"✅ PROCESSO CONCLUÍDO!")
-    print(f"   Sites processados: {sites_processados}")
-    print(f"   Erros: {sites_erro}")
-    print("=" * 60 + "\n")
+    print(f"✅ CONCLUÍDO! Processados: {sites_processados}, Erros: {sites_erro}")
+    print("=" * 60)
 
 if __name__ == "__main__":
     main()
